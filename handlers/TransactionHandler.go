@@ -40,20 +40,53 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 	idToSearchBy := chi.URLParam(r, "id")
 
-	result := h.repository.FindByID(idToSearchBy)
+	searchedTransaction := h.repository.FindByID(idToSearchBy)
 
-	if result == nil {
+	w.Header().Add("Content-Type", "application/json")
+
+	if searchedTransaction == nil {
 		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":      "Transaction not found with specified ID.",
+			"searchedId": idToSearchBy,
+		})
 		return
 	}
 
-	w.Header().Add("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	json.NewEncoder(w).Encode(searchedTransaction)
 }
 
 func (h *TransactionHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 	transactions := h.repository.FindAll()
 
 	w.Header().Add("Content-Type", "application/json")
+
 	json.NewEncoder(w).Encode(transactions)
 }
+
+func (h *TransactionHandler) Update(w http.ResponseWriter, r *http.Request) {
+	idToUpdate := chi.URLParam(r, "id")
+
+	searchedTransaction := h.repository.FindByID(idToUpdate)
+
+	w.Header().Add("Content-Type", "application/json")
+
+	if searchedTransaction == nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":      "Transaction not found with specified ID.",
+			"searchedId": idToUpdate,
+		})
+		return
+	}
+
+	var updatedTransaction models.Transaction
+
+	json.NewDecoder(r.Body).Decode(&updatedTransaction)
+
+	updatedTransaction.ID = searchedTransaction.ID
+
+	h.repository.Update(searchedTransaction.ID, &updatedTransaction)
+}
+
+// Delete

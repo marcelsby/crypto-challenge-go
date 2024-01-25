@@ -20,6 +20,7 @@ func main() {
 	r.Post("/transactions", transactionHandler.Create)
 	r.Get("/transactions", transactionHandler.FindAll)
 	r.Get("/transactions/{id}", transactionHandler.FindByID)
+	r.Put("/transactions/{id}", transactionHandler.Update)
 
 	err := http.ListenAndServe(":3000", r)
 
