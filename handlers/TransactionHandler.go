@@ -4,8 +4,10 @@ import (
 	"crypto-challenge/database"
 	"crypto-challenge/models"
 	"encoding/json"
+	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -18,30 +20,36 @@ func NewTransactionHandler(repository *database.TransactionInMemoryRepository) *
 }
 
 func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
-	newPerson := models.Transaction{
-		ID:              uuid.NewString(),
-		UserDocument:    "31377680045",
-		CreditCardToken: "5466681299600307",
-		Value:           299.8,
+	var newPerson models.Transaction
+
+	err := json.NewDecoder(r.Body).Decode(&newPerson)
+
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
 	}
+
+	newPerson.ID = uuid.NewString()
 
 	h.repository.Create(&newPerson)
 
-	w.Header().Add("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(newPerson)
 	w.WriteHeader(http.StatusCreated)
 }
 
-// func (h *PersonHandler) FindByID(w http.ResponseWriter, r *http.Request) *models.Person {
-// 	result = h.repository.FindByID(r.)
+func (h *TransactionHandler) FindByID(w http.ResponseWriter, r *http.Request) {
+	idToSearchBy := chi.URLParam(r, "id")
 
-// 	if result == nil {
-// 		w.WriteHeader(404)
-// 		return
-// 	}
+	result := h.repository.FindByID(idToSearchBy)
 
-// 	w.Write()
-// }
+	if result == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
 
 func (h *TransactionHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 	transactions := h.repository.FindAll()
