@@ -20,9 +20,9 @@ func NewTransactionHandler(repository *database.TransactionInMemoryRepository) *
 }
 
 func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var newPerson models.Transaction
+	var newTransaction models.Transaction
 
-	err := json.NewDecoder(r.Body).Decode(&newPerson)
+	err := json.NewDecoder(r.Body).Decode(&newTransaction)
 
 	if err != nil {
 		log.Println(err)
@@ -30,9 +30,9 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newPerson.ID = uuid.NewString()
+	newTransaction.ID = uuid.NewString()
 
-	h.repository.Create(&newPerson)
+	h.repository.Create(&newTransaction)
 
 	w.WriteHeader(http.StatusCreated)
 }
