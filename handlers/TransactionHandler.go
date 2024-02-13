@@ -89,4 +89,20 @@ func (h *TransactionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	h.repository.Update(searchedTransaction.ID, &updatedTransaction)
 }
 
-// Delete
+func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	var idToBeDeleted = chi.URLParam(r, "id")
+
+	var searchedTransaction = h.repository.FindByID(idToBeDeleted)
+
+	if searchedTransaction == nil {
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":      "Transaction not found with specified ID.",
+			"searchedId": idToBeDeleted,
+		})
+		return
+	}
+
+	h.repository.DeleteByID(idToBeDeleted)
+}

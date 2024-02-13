@@ -35,3 +35,12 @@ func (p *TransactionInMemoryRepository) Update(id string, updatedTransaction *mo
 		}
 	}
 }
+
+func (p *TransactionInMemoryRepository) DeleteByID(id string) {
+	for index, transaction := range p.transactions {
+		if transaction.ID == id {
+			p.transactions = append(p.transactions[:index], p.transactions[index+1:]...)
+			break
+		}
+	}
+}

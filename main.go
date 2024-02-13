@@ -21,6 +21,7 @@ func main() {
 	r.Get("/transactions", transactionHandler.FindAll)
 	r.Get("/transactions/{id}", transactionHandler.FindByID)
 	r.Put("/transactions/{id}", transactionHandler.Update)
+	r.Delete("/transactions/{id}", transactionHandler.Delete)
 
 	err := http.ListenAndServe(":3000", r)
 
