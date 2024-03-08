@@ -3,6 +3,7 @@ package main
 import (
 	"crypto-challenge/database"
 	"crypto-challenge/handlers"
+	"crypto-challenge/providers"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,7 +14,8 @@ func main() {
 	r := chi.NewRouter()
 
 	transactionRepository := database.NewTransactionInMemoryRepository()
-	transactionHandler := handlers.NewTransactionHandler(transactionRepository)
+	cryptoProvider := providers.NewCryptoProvider()
+	transactionHandler := handlers.NewTransactionHandler(transactionRepository, cryptoProvider)
 
 	r.Use(middleware.Logger)
 
