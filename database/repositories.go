@@ -31,12 +31,8 @@ func (p *TransactionInMemoryRepository) FindAll() []*models.Transaction {
 	foundTransactions := make([]*models.Transaction, len(p.transactions))
 
 	for index, transaction := range p.transactions {
-		foundTransactions[index] = &models.Transaction{
-			ID:              transaction.ID,
-			UserDocument:    transaction.UserDocument,
-			CreditCardToken: transaction.CreditCardToken,
-			Value:           transaction.Value,
-		}
+		transactionCopy := *transaction
+		foundTransactions[index] = &transactionCopy
 	}
 
 	return foundTransactions
