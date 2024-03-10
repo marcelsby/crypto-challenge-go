@@ -1,5 +1,4 @@
 // TODO: Importar a chave de uma fonte externa
-// TODO: Aprimorar o tratamento de erros para encaixar com a API REST
 package providers
 
 import (
@@ -9,63 +8,69 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"strings"
 )
 
 type CryptoProvider struct {
-	secretKey []byte
+	key []byte
 }
 
-func NewCryptoProvider() *CryptoProvider {
-	secretKey, err := hex.DecodeString("442c71674bbc3fcb5b9eed338f63521a1e6b1c352e87768377bd3bfa86048404")
-	if err != nil {
-		panic(err.Error())
-	}
+func NewCryptoProvider(secretKey string) *CryptoProvider {
+	key, _ := hex.DecodeString(secretKey)
 
-	return &CryptoProvider{secretKey: secretKey}
+	return &CryptoProvider{key}
 }
 
-func (cp *CryptoProvider) Encrypt(toEncrypt []byte) string {
-	block, err := aes.NewCipher(cp.secretKey)
+func (cp *CryptoProvider) Encrypt(toEncrypt []byte) (*string, error) {
+	block, err := aes.NewCipher(cp.key)
 	if err != nil {
-		panic(err.Error())
+		log.Println(err)
+		return nil, err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		log.Println(err)
+		return nil, err
 	}
 
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err.Error())
+		log.Println(err)
+		return nil, err
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, toEncrypt, nil)
 
-	return fmt.Sprintf("%x-%x", nonce, ciphertext)
+	nonceAndCiphertext := fmt.Sprintf("%x-%x", nonce, ciphertext)
+
+	return &nonceAndCiphertext, nil
 }
 
-func (cp *CryptoProvider) Decrypt(toDecrypt string) []byte {
+func (cp *CryptoProvider) Decrypt(toDecrypt string) (*[]byte, error) {
 	nonceWithCiphertextSplitted := strings.Split(toDecrypt, "-")
 
 	nonce, _ := hex.DecodeString(nonceWithCiphertextSplitted[0])
 	ciphertext, _ := hex.DecodeString(nonceWithCiphertextSplitted[1])
 
-	block, err := aes.NewCipher(cp.secretKey)
+	block, err := aes.NewCipher(cp.key)
 	if err != nil {
-		panic(err.Error())
+		log.Println(err)
+		return nil, err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic(err.Error())
+		log.Println(err)
+		return nil, err
 	}
 
 	decrypted, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		panic(err.Error())
+		log.Println(err)
+		return nil, err
 	}
 
-	return decrypted
+	return &decrypted, nil
 }

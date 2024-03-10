@@ -1,0 +1,13 @@
+services:
+  mysql:
+    image: mysql@sha256:eeabfa5cd6a2091bf35eb9eae6ae48aab8231fd760f5a61cd0129df454333b1d
+    container_name: "go-crypto-challenge-db"
+    environment:
+      MYSQL_USER: ${DATABASE_USER}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+      MYSQL_DATABASE: ${DATABASE_NAME}
+      MYSQL_RANDOM_ROOT_PASSWORD: yes
+    volumes:
+      - .docker/sql:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
