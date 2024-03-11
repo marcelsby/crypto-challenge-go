@@ -28,39 +28,39 @@ As tecnologias utilizadas e o critério de escolha das mesmas foram os seguintes
 
 1. Clone o projeto:
 
-```bash
-  git clone https://github.com/marcelsby/crypto-challenge-go.git
-```
+  ```bash
+    git clone https://github.com/marcelsby/crypto-challenge-go.git
+  ```
 
 2. Entre no diretório:
 
-```bash
-  cd crypto-challenge-go
-```
+  ```bash
+    cd crypto-challenge-go
+  ```
 
 3. Instale as dependências:
 
-```bash
-  go mod download
-```
+  ```bash
+    go mod download
+  ```
 
 4. Inicie o banco de dados:
 
-```bash
-  docker compose up -d mysql
-```
+  ```bash
+    docker compose up -d mysql
+  ```
 
 5. Copie o arquivo das variáveis de ambiente e preencha (para preencher consulte a seção abaixo):
 
-```bash
-  cp .env.example .env
-```
+  ```bash
+    cp .env.example .env
+  ```
 
 6. Execute a aplicação:
 
-```bash
-  go run main.go
-```
+  ```bash
+    go run main.go
+  ```
 
 ## Preenchimento das variáveis de ambiente
 
