@@ -149,8 +149,8 @@ func (h *TransactionHandler) encryptTransaction(toEncrypt *entities.Transaction)
 		return err
 	}
 
-	toEncrypt.UserDocument = *encryptedUserDocument
-	toEncrypt.CreditCardToken = *encryptedCreditCardToken
+	toEncrypt.UserDocument = encryptedUserDocument
+	toEncrypt.CreditCardToken = encryptedCreditCardToken
 
 	return nil
 }
@@ -166,8 +166,8 @@ func (h *TransactionHandler) decryptTransaction(toDecrypt *entities.Transaction)
 		return err
 	}
 
-	toDecrypt.UserDocument = string(*decryptedUserDocument)
-	toDecrypt.CreditCardToken = string(*decryptedCreditCardToken)
+	toDecrypt.UserDocument = string(decryptedUserDocument)
+	toDecrypt.CreditCardToken = string(decryptedCreditCardToken)
 
 	return nil
 }

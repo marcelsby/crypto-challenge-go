@@ -21,33 +21,33 @@ func NewCryptoProvider(secretKey string) *CryptoProvider {
 	return &CryptoProvider{key}
 }
 
-func (cp *CryptoProvider) Encrypt(toEncrypt []byte) (*string, error) {
+func (cp *CryptoProvider) Encrypt(toEncrypt []byte) (string, error) {
 	block, err := aes.NewCipher(cp.key)
 	if err != nil {
 		log.Println(err)
-		return nil, err
+		return "", err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		log.Println(err)
-		return nil, err
+		return "", err
 	}
 
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		log.Println(err)
-		return nil, err
+		return "", err
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, toEncrypt, nil)
 
 	nonceAndCiphertext := fmt.Sprintf("%x-%x", nonce, ciphertext)
 
-	return &nonceAndCiphertext, nil
+	return nonceAndCiphertext, nil
 }
 
-func (cp *CryptoProvider) Decrypt(toDecrypt string) (*[]byte, error) {
+func (cp *CryptoProvider) Decrypt(toDecrypt string) ([]byte, error) {
 	nonceWithCiphertextSplitted := strings.Split(toDecrypt, "-")
 
 	nonce, _ := hex.DecodeString(nonceWithCiphertextSplitted[0])
@@ -71,5 +71,5 @@ func (cp *CryptoProvider) Decrypt(toDecrypt string) (*[]byte, error) {
 		return nil, err
 	}
 
-	return &decrypted, nil
+	return decrypted, nil
 }
