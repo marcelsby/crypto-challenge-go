@@ -9,7 +9,6 @@ import (
 	"github.com/cristalhq/aconfig/aconfigdotenv"
 )
 
-// Criar uma struct com as propriedades requisitadas pela aplicação
 type AppConfig struct {
 	Database struct {
 		User     string

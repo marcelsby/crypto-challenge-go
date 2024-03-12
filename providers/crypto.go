@@ -1,4 +1,3 @@
-// TODO: Importar a chave de uma fonte externa
 package providers
 
 import (
