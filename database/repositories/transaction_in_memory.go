@@ -13,7 +13,8 @@ func NewTransactionInMemoryRepository() *TransactionInMemoryRepository {
 }
 
 func (p *TransactionInMemoryRepository) Create(transaction *entities.Transaction) error {
-	p.transactions = append(p.transactions, transaction)
+	copy := *transaction
+	p.transactions = append(p.transactions, &copy)
 
 	return nil
 }
@@ -47,7 +48,8 @@ func (p *TransactionInMemoryRepository) FindAll() ([]*entities.Transaction, erro
 func (p *TransactionInMemoryRepository) UpdateByID(idToUpdate string, updatedTransaction *entities.Transaction) error {
 	for index, transaction := range p.transactions {
 		if transaction.ID == idToUpdate {
-			p.transactions[index] = updatedTransaction
+			copy := *updatedTransaction
+			p.transactions[index] = &copy
 		}
 	}
 
