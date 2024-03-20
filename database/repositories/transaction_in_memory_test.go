@@ -5,126 +5,109 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestCreate(t *testing.T) {
+type TransactionInMemoryUnitTestSuite struct {
+	suite.Suite
+	underTest *TransactionInMemoryRepository
+}
+
+func (ts *TransactionInMemoryUnitTestSuite) SetupTest() {
+	ts.underTest = NewTransactionInMemoryRepository()
+}
+
+func (ts *TransactionInMemoryUnitTestSuite) TestCreate() {
 	// given
-	underTest := NewTransactionInMemoryRepository()
 	expected := createTransaction()
 
 	// when
-	err := underTest.Create(expected)
-	if err != nil {
-		t.Error(err)
-	}
+	err := ts.underTest.Create(expected)
+	ts.Nil(err)
 
 	// then
-	got := underTest.transactions[0]
+	actual := ts.underTest.transactions[0]
 
-	if *got != *expected {
-		t.Fatalf("got: %+v\n expected: %+v", got, expected)
-	}
+	ts.Equal(*expected, *actual)
 
-	if got == expected {
-		t.Fatalf("the stored Transaction must be a copy of the passed Transaction, and not a pointer to it.")
-	}
+	ts.NotSame(expected, actual, "The stored Transaction must be a copy of the passed Transaction, and not a pointer to it.")
 }
 
-func TestFindByID(t *testing.T) {
+func (ts *TransactionInMemoryUnitTestSuite) TestFindByID() {
 	// given
-	underTest := NewTransactionInMemoryRepository()
-	transaction := createTransaction()
-	underTest.transactions = append(underTest.transactions, transaction)
-	transaction.ID = uuid.NewString()
+	expected := createTransaction()
+	ts.underTest.transactions = append(ts.underTest.transactions, expected)
 
 	// when
-	got, err := underTest.FindByID(transaction.ID)
-	if err != nil {
-		t.Error(err)
-	}
+	actual, err := ts.underTest.FindByID(expected.ID)
+	ts.Nil(err)
 
 	// then
-	if got == transaction {
-		t.Fatalf("the found Transaction must be a copy of the passed Transaction, and not a pointer to it.")
-	}
+	ts.Equal(expected, actual)
+
+	ts.NotSame(expected, actual, "The returned Transaction must be a copy of the stored Transaction, and not a pointer to it.")
 }
 
-func TestFindAll(t *testing.T) {
+func (ts *TransactionInMemoryUnitTestSuite) TestFindAll() {
 	// given
-	repo := NewTransactionInMemoryRepository()
-
 	transaction1 := createTransaction()
-
 	transaction2 := createTransaction()
-	transaction2.ID = uuid.NewString()
 
-	repo.transactions = append(repo.transactions, transaction1, transaction2)
+	ts.underTest.transactions = append(ts.underTest.transactions, transaction1, transaction2)
+
+	expected := []*entities.Transaction{transaction1, transaction2}
 
 	// when
-	got, err := repo.FindAll()
-	if err != nil {
-		t.Error(err)
-	}
+	actual, err := ts.underTest.FindAll()
+	ts.Nil(err)
 
 	// then
-	if len(got) != 2 {
-		t.Errorf("len(got) - expected: 2, got: %d", len(got))
-	}
+	ts.Len(actual, 2)
 
-	if got[0] == transaction1 || got[1] == transaction2 {
-		t.Fatalf("the returned slice must contain a pointer to a copy of each stored Transaction, and not a pointer to the stored Transaction.")
-	}
+	ts.ElementsMatch(actual, expected)
+
+	ts.NotSame(actual[0], transaction1, "The returned Transaction must be a copy of the stored Transaction, and not a pointer to it.")
+	ts.NotSame(actual[1], transaction2, "The returned Transaction must be a copy of the stored Transaction, and not a pointer to it.")
 }
 
-func TestUpdateByID(t *testing.T) {
+func (ts *TransactionInMemoryUnitTestSuite) TestUpdateByID() {
 	// given
-	underTest := NewTransactionInMemoryRepository()
 	transaction := createTransaction()
-	underTest.transactions = append(underTest.transactions, transaction)
+	ts.underTest.transactions = append(ts.underTest.transactions, transaction)
 
-	updatedTransaction := createTransaction()
-	updatedTransaction.CreditCardToken = "783"
-	updatedTransaction.UserDocument = "39474452024"
-	updatedTransaction.Value = 5999.89
+	updatedTransaction := &entities.Transaction{
+		ID:              transaction.ID,
+		CreditCardToken: "783",
+		UserDocument:    "39474452024",
+		Value:           5999.89,
+	}
 
 	// when
-	err := underTest.UpdateByID(transaction.ID, updatedTransaction)
-	if err != nil {
-		t.Error(err)
-	}
+	err := ts.underTest.UpdateByID(updatedTransaction)
+	ts.Nil(err)
 
 	// then
-	if underTest.transactions[0] == updatedTransaction {
-		t.Error("The stored updated Transaction must be a copy that was made from the parameter 'updatedTransaction' passed.")
-	}
+	ts.Equal(ts.underTest.transactions[0], updatedTransaction)
 
-	if *underTest.transactions[0] != *updatedTransaction {
-		t.Errorf("expected: %+v\n got: %+v", updatedTransaction, *underTest.transactions[0])
-	}
+	ts.NotSame(ts.underTest.transactions[0], updatedTransaction,
+		"The stored updated Transaction must be a copy that was made from the parameter 'updatedTransaction' passed.")
 }
 
-func TestDeleteByID(t *testing.T) {
+func (ts *TransactionInMemoryUnitTestSuite) TestDeleteByID() {
 	// given
-	underTest := NewTransactionInMemoryRepository()
 	transaction := createTransaction()
-	underTest.transactions = append(underTest.transactions, transaction)
+	ts.underTest.transactions = append(ts.underTest.transactions, transaction)
 
 	// when
-	err := underTest.DeleteByID(transaction.ID)
-	if err != nil {
-		t.Error(err)
-	}
+	err := ts.underTest.DeleteByID(transaction.ID)
+	ts.Nil(err)
 
 	// then
-	if len(underTest.transactions) != 0 {
-		t.Errorf("Transaction not deleted, got underTest.transactions: %v", underTest.transactions)
-	}
+	ts.Len(ts.underTest.transactions, 0)
 }
 
-func TestDeleteByIDWith3Transactions(t *testing.T) {
+func (ts *TransactionInMemoryUnitTestSuite) TestDeleteByID_With3Transactions() {
 	// given
-	underTest := NewTransactionInMemoryRepository()
-
 	id1, id2, id3 := uuid.NewString(), uuid.NewString(), uuid.NewString()
 
 	transactions := []*entities.Transaction{
@@ -133,23 +116,21 @@ func TestDeleteByIDWith3Transactions(t *testing.T) {
 		createTransactionWithID(id3),
 	}
 
-	underTest.transactions = transactions
+	ts.underTest.transactions = transactions
 
 	// when
-	err := underTest.DeleteByID(id2)
-	if err != nil {
-		t.Error(err)
-	}
+	err := ts.underTest.DeleteByID(id2)
+	ts.Nil(err)
 
 	// then
-	if len(underTest.transactions) != 2 {
-		t.Errorf("the deletion isn't working, got len(underTest.transactions): %d, expected: 2", len(underTest.transactions))
-	}
+	ts.Len(ts.underTest.transactions, 2)
 
-	if underTest.transactions[0].ID != id1 && underTest.transactions[1].ID != id3 {
-		t.Errorf("the first and second remaining Transactions IDs isn't matching. Expected: [0]: %s [1]: %s, got: [0]: %s, [1]: %s", id1, id2,
-			underTest.transactions[0].ID, underTest.transactions[1].ID)
-	}
+	ts.Equal(ts.underTest.transactions[0], transactions[0])
+	ts.Equal(ts.underTest.transactions[1], transactions[2])
+}
+
+func TestTransactionInMemoryUnitTestSuite(t *testing.T) {
+	suite.Run(t, new(TransactionInMemoryUnitTestSuite))
 }
 
 func createTransactionWithID(id string) *entities.Transaction {
