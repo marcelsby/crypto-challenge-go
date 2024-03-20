@@ -45,9 +45,9 @@ func (p *TransactionInMemoryRepository) FindAll() ([]*entities.Transaction, erro
 	return foundTransactions, nil
 }
 
-func (p *TransactionInMemoryRepository) UpdateByID(idToUpdate string, updatedTransaction *entities.Transaction) error {
+func (p *TransactionInMemoryRepository) UpdateByID(updatedTransaction *entities.Transaction) error {
 	for index, transaction := range p.transactions {
-		if transaction.ID == idToUpdate {
+		if transaction.ID == updatedTransaction.ID {
 			copy := *updatedTransaction
 			p.transactions[index] = &copy
 		}

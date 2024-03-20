@@ -91,10 +91,10 @@ func (r *TransactionMySqlRepository) FindAll() ([]*entities.Transaction, error) 
 	return foundTransactions, nil
 }
 
-func (r *TransactionMySqlRepository) UpdateByID(idToUpdate string, updateTransaction *entities.Transaction) error {
+func (r *TransactionMySqlRepository) UpdateByID(updatedTransaction *entities.Transaction) error {
 	query := "UPDATE transactions SET user_document = ?, credit_card_token = ?, `value` = ?  WHERE id = ?"
 
-	_, err := r.db.Exec(query, updateTransaction.UserDocument, updateTransaction.CreditCardToken, updateTransaction.Value, updateTransaction.ID)
+	_, err := r.db.Exec(query, updatedTransaction.UserDocument, updatedTransaction.CreditCardToken, updatedTransaction.Value, updatedTransaction.ID)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (r *TransactionMySqlRepository) UpdateByID(idToUpdate string, updateTransac
 }
 
 func (r *TransactionMySqlRepository) DeleteByID(idToDelete string) error {
-	query := "DELETE FROM transactions  WHERE id = ?"
+	query := "DELETE FROM transactions WHERE id = ?"
 
 	_, err := r.db.Exec(query, idToDelete)
 	if err != nil {

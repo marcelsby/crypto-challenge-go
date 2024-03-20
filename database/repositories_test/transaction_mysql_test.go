@@ -1,48 +1,50 @@
 package repositories_test
 
 import (
-	"context"
 	"crypto-challenge/config"
+	"crypto-challenge/database/repositories"
+	"crypto-challenge/entities"
+	"crypto-challenge/helpers"
 	"database/sql"
 	"fmt"
-	"log"
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/go-connections/nat"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 type TransactionMySqlIntTestSuite struct {
 	suite.Suite
 	terminateMySqlContainer *func()
 	db                      *sql.DB
+	underTest               *repositories.TransactionMySqlRepository
 }
 
 func (ts *TransactionMySqlIntTestSuite) SetupSuite() {
 	dotenvFilePath, err := filepath.Abs(filepath.Join("..", "..", ".env"))
 	if err != nil {
-		log.Fatal(err)
+		ts.T().Fatal(err)
 	}
 
 	cfg := config.GetAppConfig(dotenvFilePath)
 
-	mySqlC, terminateMySqlC, ctxMySqlC := setupMySqlContainer(cfg)
+	migrationsFolder, err := filepath.Abs(filepath.Join("..", "..", ".docker", "sql"))
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	mySqlC, terminateMySqlC, ctxMySqlC := helpers.SetupMySqlContainer(cfg, migrationsFolder)
 
 	ts.terminateMySqlContainer = terminateMySqlC
 
 	endpoint, err := mySqlC.Endpoint(*ctxMySqlC, "")
 	if err != nil {
-		log.Fatal(err)
+		ts.T().Fatal(err)
 	}
 
 	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s", cfg.Database.User, cfg.Database.Password,
 		endpoint, cfg.Database.DbName)
-
-	ts.T().Log(dsn)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -54,6 +56,8 @@ func (ts *TransactionMySqlIntTestSuite) SetupSuite() {
 	}
 
 	ts.db = db
+
+	ts.underTest = repositories.NewTransactionMySqlRepository(db)
 }
 
 func (ts *TransactionMySqlIntTestSuite) TearDownSuite() {
@@ -61,51 +65,153 @@ func (ts *TransactionMySqlIntTestSuite) TearDownSuite() {
 	ts.db.Close()
 }
 
-func (ts *TransactionMySqlIntTestSuite) TestHello() {
-	ts.Equal("Hello", "Herou")
+func (ts *TransactionMySqlIntTestSuite) SetupTest() {
+	_, err := ts.db.Exec("DELETE FROM transactions")
+	ts.Nil(err)
+}
+
+func (ts *TransactionMySqlIntTestSuite) TestCreate() {
+	//given
+	expected := createTransaction()
+
+	//when
+	err := ts.underTest.Create(&expected)
+	ts.Nil(err)
+
+	//then
+	actual := entities.Transaction{}
+	err = ts.db.QueryRow("SELECT id, user_document, credit_card_token, `value` FROM transactions WHERE id = ?", expected.ID).Scan(
+		&actual.ID,
+		&actual.UserDocument,
+		&actual.CreditCardToken,
+		&actual.Value,
+	)
+	ts.Nil(err)
+
+	ts.Equal(expected, actual)
+}
+
+func (ts *TransactionMySqlIntTestSuite) TestFindByID() {
+	//given
+	expected := createTransaction()
+	_, err := ts.db.Exec("INSERT INTO transactions (id, user_document, credit_card_token, `value`) VALUES (?, ?, ?, ?)",
+		expected.ID, expected.UserDocument, expected.CreditCardToken, expected.Value)
+	ts.Nil(err)
+
+	//when
+	actual, err := ts.underTest.FindByID(expected.ID)
+	ts.Nil(err)
+
+	//then
+	ts.Equal(expected, *actual)
+}
+
+func (ts *TransactionMySqlIntTestSuite) TestFindByID_WhenNotFound() {
+	//given
+	idToSearch := uuid.NewString()
+
+	//when
+	actual, err := ts.underTest.FindByID(idToSearch)
+	ts.Nil(err)
+
+	//then
+	ts.Nil(actual)
+}
+
+func (ts *TransactionMySqlIntTestSuite) TestFindAll() {
+	//given
+	expected1, expected2 := createTransaction(), createTransaction()
+
+	_, err := ts.db.Exec("INSERT INTO transactions (id, user_document, credit_card_token, `value`) VALUES (?, ?, ?, ?), (?, ?, ?, ?)",
+		expected1.ID, expected1.UserDocument, expected1.CreditCardToken, expected1.Value,
+		expected2.ID, expected2.UserDocument, expected2.CreditCardToken, expected2.Value)
+	ts.Nil(err)
+
+	//when
+	actual, err := ts.underTest.FindAll()
+	ts.Nil(err)
+
+	//then
+	ts.Len(actual, 2)
+
+	expectedIDs := []string{expected1.ID, expected2.ID}
+
+	for _, foundTransaction := range actual {
+		ts.Contains(expectedIDs, foundTransaction.ID)
+	}
+}
+
+func (ts *TransactionMySqlIntTestSuite) TestFindAll_WhenEmpty() {
+	//when
+	actual, err := ts.underTest.FindAll()
+	ts.Nil(err)
+
+	//then
+	ts.Empty(actual)
+}
+
+func (ts *TransactionMySqlIntTestSuite) TestUpdateByID() {
+	//given
+	newTransaction := createTransaction()
+
+	_, err := ts.db.Exec("INSERT INTO transactions (id, user_document, credit_card_token, `value`) VALUES (?, ?, ?, ?)",
+		newTransaction.ID, newTransaction.UserDocument, newTransaction.CreditCardToken, newTransaction.Value)
+	ts.Nil(err)
+
+	expected := entities.Transaction{
+		ID:              newTransaction.ID,
+		Value:           299.99,
+		UserDocument:    "27184927",
+		CreditCardToken: "663",
+	}
+
+	//when
+	err = ts.underTest.UpdateByID(&expected)
+	ts.Nil(err)
+
+	//then
+	actual := entities.Transaction{}
+	err = ts.db.QueryRow("SELECT id, user_document, credit_card_token, `value` FROM transactions WHERE id = ?", newTransaction.ID).Scan(
+		&actual.ID,
+		&actual.UserDocument,
+		&actual.CreditCardToken,
+		&actual.Value,
+	)
+	ts.Nil(err)
+
+	ts.Equal(expected, actual)
+}
+
+func (ts *TransactionMySqlIntTestSuite) TestDeleteByID() {
+	//given
+	newTransaction := createTransaction()
+
+	_, err := ts.db.Exec("INSERT INTO transactions (id, user_document, credit_card_token, `value`) VALUES (?, ?, ?, ?)",
+		newTransaction.ID, newTransaction.UserDocument, newTransaction.CreditCardToken, newTransaction.Value)
+	ts.Nil(err)
+
+	//when
+	err = ts.underTest.DeleteByID(newTransaction.ID)
+	ts.Nil(err)
+
+	//then
+	var actual int
+
+	err = ts.db.QueryRow("SELECT count(*) FROM transactions").Scan(&actual)
+	ts.Nil(err)
+
+	ts.Zero(actual)
 }
 
 func TestTransactionMySqlIntTestSuite(t *testing.T) {
 	suite.Run(t, new(TransactionMySqlIntTestSuite))
 }
 
-func setupMySqlContainer(cfg *config.AppConfig, dsn string) (testcontainers.Container, *func(), *context.Context) {
-	ctx := context.Background()
-	req := testcontainers.ContainerRequest{
-		Image:        "mysql@sha256:eeabfa5cd6a2091bf35eb9eae6ae48aab8231fd760f5a61cd0129df454333b1d",
-		ExposedPorts: []string{"3306/tcp"},
-		// (`/usr/sbin/mysqld: ready for connections\.`).AsRegexp()
-		WaitingFor: wait.ForSQL(nat.Port(cfg.Database.Port), "mysql", func(host string) {
-			return dsn
-		}),
-		Files: []testcontainers.ContainerFile{
-			{
-				HostFilePath:      "../../.docker/sql/create-transactions-table.sql",
-				ContainerFilePath: "/docker-entrypoint-initdb.d/create-transactions-table.sql",
-				FileMode:          0o755,
-			},
-		},
-		Env: map[string]string{
-			"MYSQL_USER":                 cfg.Database.User,
-			"MYSQL_PASSWORD":             cfg.Database.Password,
-			"MYSQL_DATABASE":             cfg.Database.DbName,
-			"MYSQL_RANDOM_ROOT_PASSWORD": "yes",
-		},
+func createTransaction() entities.Transaction {
+	return entities.Transaction{
+		ID:              uuid.NewString(),
+		UserDocument:    "12345",
+		CreditCardToken: "755",
+		Value:           9999.99,
 	}
-
-	mySqlC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		log.Fatal("Could not start MySQL container.", err)
-	}
-
-	terminateMySqlC := func() {
-		if err := mySqlC.Terminate(ctx); err != nil {
-			log.Fatal("Could not stop MySQL container.", err)
-		}
-	}
-
-	return mySqlC, &terminateMySqlC, &ctx
 }

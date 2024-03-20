@@ -117,7 +117,7 @@ func (h *TransactionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.repository.UpdateByID(searchedTransaction.ID, &updatedTransaction)
+	h.repository.UpdateByID(&updatedTransaction)
 }
 
 func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
