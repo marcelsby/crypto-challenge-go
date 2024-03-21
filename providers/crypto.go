@@ -11,17 +11,22 @@ import (
 	"strings"
 )
 
-type CryptoProvider struct {
+type CryptoProvider interface {
+	Encrypt([]byte) (string, error)
+	Decrypt(string) ([]byte, error)
+}
+
+type AesGcm256CryptoProvider struct {
 	key []byte
 }
 
-func NewCryptoProvider(secretKey string) *CryptoProvider {
+func NewAesGcm256CryptoProvider(secretKey string) *AesGcm256CryptoProvider {
 	key, _ := hex.DecodeString(secretKey)
 
-	return &CryptoProvider{key}
+	return &AesGcm256CryptoProvider{key}
 }
 
-func (cp *CryptoProvider) Encrypt(toEncrypt []byte) (string, error) {
+func (cp *AesGcm256CryptoProvider) Encrypt(toEncrypt []byte) (string, error) {
 	block, err := aes.NewCipher(cp.key)
 	if err != nil {
 		log.Println(err)
@@ -47,7 +52,7 @@ func (cp *CryptoProvider) Encrypt(toEncrypt []byte) (string, error) {
 	return nonceAndCiphertext, nil
 }
 
-func (cp *CryptoProvider) Decrypt(toDecrypt string) ([]byte, error) {
+func (cp *AesGcm256CryptoProvider) Decrypt(toDecrypt string) ([]byte, error) {
 	nonceWithCiphertextSplitted := strings.Split(toDecrypt, "-")
 
 	nonce, _ := hex.DecodeString(nonceWithCiphertextSplitted[0])

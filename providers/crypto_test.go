@@ -11,7 +11,7 @@ var secretKey = "c7b81104b9fc8b05ff85995f6d34d5b18cfbb0cff21ff2ceab154a3bcfae3ab
 
 func TestEncryptAndDecryptString(t *testing.T) {
 	// given
-	underTest := NewCryptoProvider(secretKey)
+	underTest := NewAesGcm256CryptoProvider(secretKey)
 	expected := "lorem ipsum"
 
 	// when

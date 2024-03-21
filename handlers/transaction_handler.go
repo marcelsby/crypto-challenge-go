@@ -14,10 +14,10 @@ import (
 
 type TransactionHandler struct {
 	repository     repositories.TransactionRepository
-	cryptoProvider *providers.CryptoProvider
+	cryptoProvider providers.CryptoProvider
 }
 
-func NewTransactionHandler(repository repositories.TransactionRepository, cryptoProvider *providers.CryptoProvider) *TransactionHandler {
+func NewTransactionHandler(repository repositories.TransactionRepository, cryptoProvider providers.CryptoProvider) *TransactionHandler {
 	return &TransactionHandler{repository, cryptoProvider}
 }
 

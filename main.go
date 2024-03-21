@@ -34,7 +34,7 @@ func main() {
 	}
 
 	transactionRepository := repositories.NewTransactionMySqlRepository(db)
-	cryptoProvider := providers.NewCryptoProvider(cfg.Cryptography.SecretKey)
+	cryptoProvider := providers.NewAesGcm256CryptoProvider(cfg.Cryptography.SecretKey)
 	transactionHandler := handlers.NewTransactionHandler(transactionRepository, cryptoProvider)
 
 	r.Use(middleware.Logger)
