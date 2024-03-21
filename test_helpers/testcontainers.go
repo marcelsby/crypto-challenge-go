@@ -1,11 +1,13 @@
-package helpers
+package test_helpers
 
 import (
 	"context"
 	"crypto-challenge/config"
+	"database/sql"
 	"fmt"
 	"log"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/docker/go-connections/nat"
@@ -60,4 +62,32 @@ func SetupMySqlContainer(cfg *config.AppConfig, migrationsFolderPath string) (te
 	}
 
 	return mySqlC, &terminateMySqlC, &ctx
+}
+
+func GetMySqlContainerDB(t *testing.T, mySqlC testcontainers.Container, ctxMySqlC *context.Context, cfg *config.AppConfig) *sql.DB {
+	endpoint, err := mySqlC.Endpoint(*ctxMySqlC, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Container endpoint: %s\n", endpoint)
+
+	dbCfg := mysql.Config{
+		User:   cfg.Database.User,
+		Passwd: cfg.Database.Password,
+		Net:    "tcp",
+		Addr:   endpoint,
+		DBName: cfg.Database.DbName,
+	}
+
+	db, err := sql.Open("mysql", dbCfg.FormatDSN())
+	if err != nil {
+		t.Fatal("Failed opening connection to MySQL. ", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		t.Fatal("Failed pinging MySQL. ", err)
+	}
+
+	return db
 }

@@ -4,9 +4,8 @@ import (
 	"crypto-challenge/config"
 	"crypto-challenge/database/repositories"
 	"crypto-challenge/entities"
-	"crypto-challenge/helpers"
+	"crypto-challenge/test_helpers"
 	"database/sql"
-	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -29,31 +28,16 @@ func (ts *TransactionMySqlIntTestSuite) SetupSuite() {
 
 	cfg := config.GetAppConfig(dotenvFilePath)
 
-	migrationsFolder, err := filepath.Abs(filepath.Join("..", "..", ".docker", "sql"))
+	migrationsFolderPath, err := filepath.Abs(filepath.Join("..", "..", ".docker", "sql"))
 	if err != nil {
 		ts.T().Fatal(err)
 	}
 
-	mySqlC, terminateMySqlC, ctxMySqlC := helpers.SetupMySqlContainer(cfg, migrationsFolder)
+	mySqlC, terminateMySqlC, ctxMySqlC := test_helpers.SetupMySqlContainer(cfg, migrationsFolderPath)
 
 	ts.terminateMySqlContainer = terminateMySqlC
 
-	endpoint, err := mySqlC.Endpoint(*ctxMySqlC, "")
-	if err != nil {
-		ts.T().Fatal(err)
-	}
-
-	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s", cfg.Database.User, cfg.Database.Password,
-		endpoint, cfg.Database.DbName)
-
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		ts.T().Fatal("Failed opening connection to MySQL. ", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		ts.T().Fatal("Failed pinging MySQL. ", err)
-	}
+	db := test_helpers.GetMySqlContainerDB(ts.T(), mySqlC, ctxMySqlC, cfg)
 
 	ts.db = db
 
