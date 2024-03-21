@@ -18,8 +18,6 @@ import (
 func main() {
 	cfg := config.GetAppConfig(".env")
 
-	r := chi.NewRouter()
-
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.DbName)
 
 	db, err := sql.Open("mysql", dsn)
@@ -33,17 +31,13 @@ func main() {
 		panic(err.Error())
 	}
 
-	transactionRepository := repositories.NewTransactionMySqlRepository(db)
-	cryptoProvider := providers.NewAesGcm256CryptoProvider(cfg.Cryptography.SecretKey)
-	transactionHandler := handlers.NewTransactionHandler(transactionRepository, cryptoProvider)
-
+	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	r.Post("/transactions", transactionHandler.Create)
-	r.Get("/transactions", transactionHandler.FindAll)
-	r.Get("/transactions/{id}", transactionHandler.FindByID)
-	r.Put("/transactions/{id}", transactionHandler.Update)
-	r.Delete("/transactions/{id}", transactionHandler.Delete)
+	transactionRepository := repositories.NewTransactionMySqlRepository(db)
+	cryptoProvider := providers.NewAesGcm256CryptoProvider(cfg.Cryptography.SecretKey)
+
+	handlers.MountTransactionHandler(r, transactionRepository, cryptoProvider)
 
 	err = http.ListenAndServe(":3000", r)
 	if err != nil {
