@@ -1,7 +1,11 @@
 package providers
 
-import "crypto-challenge/entities"
+import (
+	"crypto-challenge/entities"
+	"errors"
+)
 
+// TODO: Criar um mock para essa interface e apagar a implementação manual 'MockTransactionCryptoProvider'
 type TransactionCryptoProvider interface {
 	Encrypt(*entities.Transaction) error
 	Decrypt(*entities.Transaction) error
@@ -45,6 +49,30 @@ func (tcp *StandardTransactionCryptoProvider) Decrypt(toDecrypt *entities.Transa
 
 	toDecrypt.UserDocument = string(decryptedUserDocument)
 	toDecrypt.CreditCardToken = string(decryptedCreditCardToken)
+
+	return nil
+}
+
+type MockTransactionCryptoProvider struct {
+	isBadMock bool
+}
+
+func NewMockTransactionCryptoProvider(badMock bool) *MockTransactionCryptoProvider {
+	return &MockTransactionCryptoProvider{isBadMock: badMock}
+}
+
+func (mtcp *MockTransactionCryptoProvider) Encrypt(toEncrypt *entities.Transaction) error {
+	if mtcp.isBadMock {
+		return errors.New("bad encryption")
+	}
+
+	return nil
+}
+
+func (mtcp *MockTransactionCryptoProvider) Decrypt(toDecrypt *entities.Transaction) error {
+	if mtcp.isBadMock {
+		return errors.New("bad decryption")
+	}
 
 	return nil
 }

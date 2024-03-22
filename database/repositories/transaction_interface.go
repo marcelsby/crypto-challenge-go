@@ -1,3 +1,4 @@
+// TODO: Criar um mock pra essa interface
 package repositories
 
 import "crypto-challenge/entities"
