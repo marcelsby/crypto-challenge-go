@@ -36,8 +36,9 @@ func main() {
 
 	transactionRepository := repositories.NewTransactionMySqlRepository(db)
 	cryptoProvider := providers.NewAesGcm256CryptoProvider(cfg.Cryptography.SecretKey)
+	transactionCryptoProvider := providers.NewStandardTransactionCryptoProvider(cryptoProvider)
 
-	handlers.MountTransactionHandler(r, transactionRepository, cryptoProvider)
+	r.Mount("/", handlers.GetTransactionRouter(transactionRepository, transactionCryptoProvider))
 
 	err = http.ListenAndServe(":3000", r)
 	if err != nil {
