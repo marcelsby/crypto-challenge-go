@@ -4,7 +4,7 @@ import (
 	"crypto-challenge/config"
 	"crypto-challenge/database/repositories"
 	"crypto-challenge/entities"
-	"crypto-challenge/test_helpers"
+	"crypto-challenge/testhelpers"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -33,11 +33,11 @@ func (ts *TransactionMySqlIntTestSuite) SetupSuite() {
 		ts.T().Fatal(err)
 	}
 
-	mySqlC, terminateMySqlC, ctxMySqlC := test_helpers.SetupMySqlContainer(cfg, migrationsFolderPath)
+	mySqlC, terminateMySqlC, ctxMySqlC := testhelpers.SetupMySqlContainer(cfg, migrationsFolderPath)
 
 	ts.terminateMySqlContainer = terminateMySqlC
 
-	db := test_helpers.GetMySqlContainerDB(ts.T(), mySqlC, ctxMySqlC, cfg)
+	db := testhelpers.GetMySqlContainerDB(ts.T(), mySqlC, ctxMySqlC, cfg)
 
 	ts.db = db
 

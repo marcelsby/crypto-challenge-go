@@ -13,7 +13,6 @@ import (
 )
 
 type TransactionHandler struct {
-	router                    *chi.Mux
 	repository                repositories.TransactionRepository
 	transactionCryptoProvider providers.TransactionCryptoProvider
 }
@@ -158,7 +157,7 @@ func (h *TransactionHandler) setupInternalServerErrorResponse(w http.ResponseWri
 func GetTransactionRouter(repository repositories.TransactionRepository, transactionCryptoProvider providers.TransactionCryptoProvider) *chi.Mux {
 	r := chi.NewRouter()
 
-	handler := &TransactionHandler{r, repository, transactionCryptoProvider}
+	handler := &TransactionHandler{repository, transactionCryptoProvider}
 
 	r.Route("/transactions", func(r chi.Router) {
 		r.Post("/", handler.Create)
