@@ -1,0 +1,9 @@
+packages:
+  crypto-challenge/database/repositories:
+    interfaces:
+      # select the interfaces you want mocked
+      TransactionRepository:
+  crypto-challenge/providers:
+      interfaces:
+        # select the interfaces you want mocked
+        TransactionCryptoProvider:

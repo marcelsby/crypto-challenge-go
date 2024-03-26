@@ -154,7 +154,7 @@ func (h *TransactionHandler) setupInternalServerErrorResponse(w http.ResponseWri
 	})
 }
 
-func GetTransactionRouter(repository repositories.TransactionRepository, transactionCryptoProvider providers.TransactionCryptoProvider) *chi.Mux {
+func NewTransactionRouter(repository repositories.TransactionRepository, transactionCryptoProvider providers.TransactionCryptoProvider) *chi.Mux {
 	r := chi.NewRouter()
 
 	handler := &TransactionHandler{repository, transactionCryptoProvider}

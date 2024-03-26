@@ -38,7 +38,7 @@ func main() {
 	cryptoProvider := providers.NewAesGcm256CryptoProvider(cfg.Cryptography.SecretKey)
 	transactionCryptoProvider := providers.NewStandardTransactionCryptoProvider(cryptoProvider)
 
-	r.Mount("/", handlers.GetTransactionRouter(transactionRepository, transactionCryptoProvider))
+	r.Mount("/", handlers.NewTransactionRouter(transactionRepository, transactionCryptoProvider))
 
 	err = http.ListenAndServe(":3000", r)
 	if err != nil {
