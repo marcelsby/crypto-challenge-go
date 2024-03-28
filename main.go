@@ -7,6 +7,7 @@ import (
 	"crypto-challenge/providers"
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -40,6 +41,7 @@ func main() {
 
 	r.Mount("/", handlers.NewTransactionRouter(transactionRepository, transactionCryptoProvider))
 
+	log.Println("🚀 Server running at: 127.0.0.1:3000")
 	err = http.ListenAndServe(":3000", r)
 	if err != nil {
 		panic(err)

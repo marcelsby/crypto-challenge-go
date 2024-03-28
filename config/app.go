@@ -27,9 +27,7 @@ func GetAppConfig(configFilePath string) *AppConfig {
 	var cfg AppConfig
 
 	loader := aconfig.LoaderFor(&cfg, aconfig.Config{
-		SkipEnv:            true,
-		SkipFlags:          true,
-		FailOnFileNotFound: true,
+		SkipFlags: true,
 		FileDecoders: map[string]aconfig.FileDecoder{
 			".env": aconfigdotenv.New(),
 		},

@@ -1,0 +1,9 @@
+/.docker/
+/.git*/
+
+/.mockery.yml
+/README.MD
+/.env
+/.env.example
+
+.gitignore

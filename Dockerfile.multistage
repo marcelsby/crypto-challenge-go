@@ -1,0 +1,27 @@
+FROM golang:1.22-alpine AS build
+
+RUN adduser -DH -u 1001 -s /bin/sh marcelsby
+
+WORKDIR /app
+
+COPY go.mod ./
+
+RUN go mod download
+
+COPY . .
+
+RUN go build -o /crypto-challenge-api
+
+FROM scratch
+
+WORKDIR /
+
+COPY --from=build /crypto-challenge-api /crypto-challenge-api
+
+COPY --from=build /etc/passwd /etc/passwd
+
+USER 1001
+
+EXPOSE 3000
+
+ENTRYPOINT ["/crypto-challenge-api"]

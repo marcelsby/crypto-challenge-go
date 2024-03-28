@@ -45,6 +45,38 @@ Caso os testes falhem com a mensagem `"testcontainers.go:70: port not found"` ve
 do projeto está desligado, por alguma razão ele causa um conflito com o Testcontainers, mesmo que este último alega mapear
 as portas expostas dos contêiners para portas aleatórias no *host*.
 
+## Executar com Docker
+
+1. Clone o projeto:
+
+    ```bash
+      git clone https://github.com/marcelsby/crypto-challenge-go.git
+    ```
+
+2. Entre no diretório:
+
+    ```bash
+      cd crypto-challenge-go
+    ```
+
+3. Copie o arquivo das variáveis de ambiente e preencha de acordo com a seção [abaixo](#preenchimento-das-variáveis-de-ambiente):
+
+    ```bash
+      cp .env.example .env
+    ```
+
+4. Execute os contêiners Docker:
+
+    ```bash
+      docker compose up -d
+    ```
+
+5. Faça requests para a API (127.0.0.1:3000) 🎉:
+
+    ```bash
+      http POST :3000/transactions cpf="28875243981" creditCardToken="937" value:=1299.80
+    ```
+
 ## Executar localmente
 
 1. Clone o projeto:
@@ -71,7 +103,7 @@ as portas expostas dos contêiners para portas aleatórias no *host*.
       docker compose up -d mysql
     ```
 
-5. Copie o arquivo das variáveis de ambiente e preencha (para preencher consulte a seção abaixo):
+5. Copie o arquivo das variáveis de ambiente e preencha de acordo com a seção [abaixo](#preenchimento-das-variáveis-de-ambiente):
 
     ```bash
       cp .env.example .env
@@ -81,6 +113,12 @@ as portas expostas dos contêiners para portas aleatórias no *host*.
 
     ```bash
       go run main.go
+    ```
+
+7. Faça requests para a API (127.0.0.1:3000) 🎉:
+
+    ```bash
+      http POST :3000/transactions cpf="28875243981" creditCardToken="937" value:=1299.80
     ```
 
 ## Preenchimento das variáveis de ambiente
