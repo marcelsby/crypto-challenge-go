@@ -5,7 +5,6 @@ import (
 	"crypto-challenge/entities"
 	"crypto-challenge/providers"
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -22,7 +21,6 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&newTransaction)
 	if err != nil {
-		log.Println(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
@@ -47,7 +45,11 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 	idToSearchBy := chi.URLParam(r, "id")
 
-	searchedTransaction, _ := h.repository.FindByID(idToSearchBy)
+	searchedTransaction, err := h.repository.FindByID(idToSearchBy)
+	if err != nil {
+		h.setupInternalServerErrorResponse(w)
+		return
+	}
 
 	w.Header().Add("Content-Type", "application/json")
 
@@ -60,7 +62,7 @@ func (h *TransactionHandler) FindByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.transactionCryptoProvider.Decrypt(searchedTransaction)
+	err = h.transactionCryptoProvider.Decrypt(searchedTransaction)
 	if err != nil {
 		h.setupInternalServerErrorResponse(w)
 		return
@@ -76,8 +78,6 @@ func (h *TransactionHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("Content-Type", "application/json")
-
 	for _, transaction := range transactions {
 		err := h.transactionCryptoProvider.Decrypt(transaction)
 		if err != nil {
@@ -86,6 +86,7 @@ func (h *TransactionHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Add("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(transactions)
 }
 

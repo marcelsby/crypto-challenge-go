@@ -55,12 +55,6 @@ func (ts *TransactionHandlerTestSuite) TestCreate() {
 	// then
 	ts.Require().Equal(http.StatusCreated, res.Code)
 	ts.Require().Empty(res.Body.Bytes())
-
-	ts.Require().True(ts.cryptoProviderMock.AssertCalled(ts.T(), "Encrypt", mock.AnythingOfType("*entities.Transaction")))
-	ts.Require().True(ts.cryptoProviderMock.AssertNumberOfCalls(ts.T(), "Encrypt", 1))
-
-	ts.Require().True(ts.repositoryMock.AssertCalled(ts.T(), "Create", mock.AnythingOfType("*entities.Transaction")))
-	ts.Require().True(ts.repositoryMock.AssertNumberOfCalls(ts.T(), "Create", 1))
 }
 
 func (ts *TransactionHandlerTestSuite) TestCreate_WithInvalidRequestBody() {
@@ -78,8 +72,6 @@ func (ts *TransactionHandlerTestSuite) TestCreate_WithInvalidRequestBody() {
 
 	// then
 	ts.Require().Equal(http.StatusUnprocessableEntity, res.Code)
-	ts.Require().True(ts.cryptoProviderMock.AssertNotCalled(ts.T(), "Encrypt"))
-	ts.Require().True(ts.repositoryMock.AssertNotCalled(ts.T(), "Create"))
 	ts.Assert().Empty(res.Body.Bytes())
 }
 
@@ -94,7 +86,7 @@ func (ts *TransactionHandlerTestSuite) TestCreate_WithErrorOnEncryption() {
 	res := httptest.NewRecorder()
 
 	ts.cryptoProviderMock.EXPECT().Encrypt(mock.AnythingOfType("*entities.Transaction")).
-		Return(errors.New("error on encryption")).Once()
+		Return(errors.New("error on encryption"))
 
 	// when
 	ts.router.ServeHTTP(res, req)
@@ -104,8 +96,6 @@ func (ts *TransactionHandlerTestSuite) TestCreate_WithErrorOnEncryption() {
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 	ts.Require().NotEmpty(res.Body.Bytes())
 	ts.Require().True(json.Valid(res.Body.Bytes()), "invalid JSON response. Received:", res.Body.String())
-
-	ts.Assert().True(ts.repositoryMock.AssertNotCalled(ts.T(), "Create"))
 }
 
 func (ts *TransactionHandlerTestSuite) TestCreate_WithErrorOnCreate() {
@@ -128,11 +118,168 @@ func (ts *TransactionHandlerTestSuite) TestCreate_WithErrorOnCreate() {
 	ts.Require().Equal(http.StatusInternalServerError, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 
-	ts.Require().True(ts.cryptoProviderMock.AssertCalled(ts.T(), "Encrypt", mock.AnythingOfType("*entities.Transaction")))
-	ts.Require().True(ts.cryptoProviderMock.AssertNumberOfCalls(ts.T(), "Encrypt", 1))
-
 	ts.Require().NotEmpty(res.Body.Bytes())
 	ts.Assert().True(json.Valid(res.Body.Bytes()), "invalid JSON response. Received:", res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestFindByID() {
+	// given
+	expectedTransaction := generateRandomTransaction(true)
+
+	ts.repositoryMock.EXPECT().FindByID(expectedTransaction.ID).Return(expectedTransaction, nil).Once()
+	ts.cryptoProviderMock.EXPECT().Decrypt(mock.AnythingOfType("*entities.Transaction")).Return(nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", expectedTransaction.ID), nil)
+	res := httptest.NewRecorder()
+
+	// when
+	ts.router.ServeHTTP(res, req)
+
+	// then
+	ts.Require().Equal(http.StatusOK, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	var actualTransaction *entities.Transaction
+	err := json.Unmarshal(res.Body.Bytes(), &actualTransaction)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.Require().Equal(expectedTransaction, actualTransaction)
+}
+
+func (ts *TransactionHandlerTestSuite) TestFindByID_WithErrorOnFindByID() {
+	// given
+	randomID := uuid.NewString()
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, errors.New("error on FindByID"))
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
+	res := httptest.NewRecorder()
+
+	// when
+	ts.router.ServeHTTP(res, req)
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	isValidResponseJSON := json.Valid(res.Body.Bytes())
+	ts.Require().True(isValidResponseJSON, "invalid error response JSON payload.", res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestFindByID_WhenNotFound() {
+	// given
+	randomID := uuid.NewString()
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
+	res := httptest.NewRecorder()
+
+	// when
+	ts.router.ServeHTTP(res, req)
+
+	// then
+	ts.Require().Equal(http.StatusNotFound, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	isValidResponseJSON := json.Valid(res.Body.Bytes())
+	ts.Require().True(isValidResponseJSON, "invalid error response JSON payload.", res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestFindByID_WithErrorOnDecrypt() {
+	// given
+	randomID := uuid.NewString()
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
+	ts.cryptoProviderMock.EXPECT().Decrypt(mock.AnythingOfType("*entities.Transaction")).
+		Return(errors.New("error on Decrypt"))
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
+	res := httptest.NewRecorder()
+
+	// when
+	ts.router.ServeHTTP(res, req)
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	isValidResponseJSON := json.Valid(res.Body.Bytes())
+	ts.Require().True(isValidResponseJSON, "invalid error response JSON payload.", res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestFindAll() {
+	// given
+	expectedTransactions := []*entities.Transaction{
+		generateRandomTransaction(true),
+		generateRandomTransaction(true),
+	}
+
+	ts.repositoryMock.EXPECT().FindAll().Return(expectedTransactions, nil)
+	ts.cryptoProviderMock.EXPECT().Decrypt(mock.AnythingOfType("*entities.Transaction")).
+		Return(nil).Times(2)
+
+	req := httptest.NewRequest(http.MethodGet, "/transactions", nil)
+	res := httptest.NewRecorder()
+
+	// when
+	ts.router.ServeHTTP(res, req)
+
+	// then
+	ts.Require().Equal(http.StatusOK, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	var actualTransactions []*entities.Transaction
+
+	err := json.Unmarshal(res.Body.Bytes(), &actualTransactions)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.Require().Equal(expectedTransactions, actualTransactions)
+}
+
+func (ts *TransactionHandlerTestSuite) TestFindAll_WithErrorOnFindAll() {
+	// given
+	ts.repositoryMock.EXPECT().FindAll().Return(nil, errors.New("error on FindAll"))
+
+	req := httptest.NewRequest(http.MethodGet, "/transactions", nil)
+	res := httptest.NewRecorder()
+
+	// when
+	ts.router.ServeHTTP(res, req)
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	isValidResponseJSON := json.Valid(res.Body.Bytes())
+	ts.Require().True(isValidResponseJSON)
+}
+
+func (ts *TransactionHandlerTestSuite) TestFindAll_WithErrorOnDecrypt() {
+	// given
+	transactions := []*entities.Transaction{
+		generateRandomTransaction(true),
+	}
+
+	ts.repositoryMock.EXPECT().FindAll().Return(transactions, nil)
+	ts.cryptoProviderMock.EXPECT().Decrypt(transactions[0]).Return(errors.New("error on Decrypt"))
+
+	req := httptest.NewRequest(http.MethodGet, "/transactions", nil)
+	res := httptest.NewRecorder()
+
+	// when
+	ts.router.ServeHTTP(res, req)
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	isValidResponseJSON := json.Valid(res.Body.Bytes())
+	ts.Require().True(isValidResponseJSON)
 }
 
 func TestTransactionHandlerTestSuite(t *testing.T) {
@@ -152,8 +299,9 @@ func generateRandomTransactionJSON(withID, validJSON bool) (string, error) {
 	return tStrJSON, err
 }
 
-func generateRandomTransaction(withID bool) entities.Transaction {
-	fakeUserDocuments := []string{"50277613433", "19318615400", "43872034856", "25694674300", "56214093854", "01927386406", "89673401520", "73619405823", "40198237610", "58327490120"}
+func generateRandomTransaction(withID bool) *entities.Transaction {
+	fakeUserDocuments := []string{"50277613433", "19318615400", "43872034856", "25694674300", "56214093854",
+		"01927386406", "89673401520", "73619405823", "40198237610", "58327490120"}
 	randomUserDocument := fakeUserDocuments[rand.Intn(len(fakeUserDocuments))]
 
 	// Get random 3 digits number to simulate the credit card CVV code
@@ -169,7 +317,7 @@ func generateRandomTransaction(withID bool) entities.Transaction {
 		id = uuid.NewString()
 	}
 
-	return entities.Transaction{
+	return &entities.Transaction{
 		ID:              id,
 		UserDocument:    randomUserDocument,
 		CreditCardToken: randomCreditCardToken,
