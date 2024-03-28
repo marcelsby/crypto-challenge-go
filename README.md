@@ -24,6 +24,27 @@ As tecnologias utilizadas e o critério de escolha das mesmas foram os seguintes
 
     ![dados criptografados na tabela transactions](.github/assets/cryptography-at-database.png)
 
+## Executar os testes
+
+Com coverage:
+
+```bash
+go test -cover ./...
+```
+
+Com coverage e logs:
+
+```bash
+go test -cover ./...
+```
+
+Os testes de integração do repositório sobem um contêiner de MySQL utilizando a biblioteca Testcontainers,
+logo é necessário ter o Docker instalado na sua máquina para que os testes de integração possam executar normalmente.
+
+Caso os testes falhem com a mensagem `"testcontainers.go:70: port not found"` verifique se o MySQL do `docker-compose.yml`
+do projeto está desligado, por alguma razão ele causa um conflito com o Testcontainers, mesmo que este último alega mapear
+as portas expostas dos contêiners para portas aleatórias no *host*.
+
 ## Executar localmente
 
 1. Clone o projeto:
