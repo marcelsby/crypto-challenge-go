@@ -6,8 +6,8 @@ import (
 	"crypto-challenge/mocks/crypto-challenge/database/repositories"
 	"crypto-challenge/mocks/crypto-challenge/providers"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -17,8 +17,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
+
+const InvalidJSONResponsePayload = "invalid JSON response payload."
 
 type TransactionHandlerTestSuite struct {
 	suite.Suite
@@ -43,14 +46,11 @@ func (ts *TransactionHandlerTestSuite) TestCreate() {
 		ts.T().Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/transactions", strings.NewReader(validNewTransactionJSON))
-	res := httptest.NewRecorder()
-
 	ts.cryptoProviderMock.EXPECT().Encrypt(mock.AnythingOfType("*entities.Transaction")).Return(nil).Once()
 	ts.repositoryMock.EXPECT().Create(mock.AnythingOfType("*entities.Transaction")).Return(nil).Once()
 
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodPost, "/transactions", strings.NewReader(validNewTransactionJSON))
 
 	// then
 	ts.Require().Equal(http.StatusCreated, res.Code)
@@ -64,11 +64,8 @@ func (ts *TransactionHandlerTestSuite) TestCreate_WithInvalidRequestBody() {
 		ts.T().Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/transactions", strings.NewReader(invalidNewTransactionJSON))
-	res := httptest.NewRecorder()
-
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodPost, "/transactions", strings.NewReader(invalidNewTransactionJSON))
 
 	// then
 	ts.Require().Equal(http.StatusUnprocessableEntity, res.Code)
@@ -82,20 +79,18 @@ func (ts *TransactionHandlerTestSuite) TestCreate_WithErrorOnEncryption() {
 		ts.T().Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/transactions", strings.NewReader(validNewTransactionJSON))
-	res := httptest.NewRecorder()
-
 	ts.cryptoProviderMock.EXPECT().Encrypt(mock.AnythingOfType("*entities.Transaction")).
-		Return(errors.New("error on encryption"))
+		Return(errorOnMethod("Encrypt"))
 
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodPost, "/transactions", strings.NewReader(validNewTransactionJSON))
 
 	// then
 	ts.Require().Equal(http.StatusInternalServerError, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 	ts.Require().NotEmpty(res.Body.Bytes())
-	ts.Require().True(json.Valid(res.Body.Bytes()), "invalid JSON response. Received:", res.Body.String())
+	requireValidJSON(ts.T(), res.Body.Bytes(), "invalid error response JSON payload.",
+		res.Body.String())
 }
 
 func (ts *TransactionHandlerTestSuite) TestCreate_WithErrorOnCreate() {
@@ -105,21 +100,19 @@ func (ts *TransactionHandlerTestSuite) TestCreate_WithErrorOnCreate() {
 		ts.T().Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/transactions", strings.NewReader(validNewTransactionJSON))
-	res := httptest.NewRecorder()
-
 	ts.cryptoProviderMock.EXPECT().Encrypt(mock.AnythingOfType("*entities.Transaction")).Return(nil)
-	ts.repositoryMock.EXPECT().Create(mock.AnythingOfType("*entities.Transaction")).Return(errors.New("error on create"))
+	ts.repositoryMock.EXPECT().Create(mock.AnythingOfType("*entities.Transaction")).Return(errorOnMethod("create"))
 
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodPost, "/transactions", strings.NewReader(validNewTransactionJSON))
 
 	// then
 	ts.Require().Equal(http.StatusInternalServerError, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 
 	ts.Require().NotEmpty(res.Body.Bytes())
-	ts.Assert().True(json.Valid(res.Body.Bytes()), "invalid JSON response. Received:", res.Body.String())
+	requireValidJSON(ts.T(), res.Body.Bytes(), "invalid error response JSON payload.",
+		res.Body.String())
 }
 
 func (ts *TransactionHandlerTestSuite) TestFindByID() {
@@ -129,11 +122,9 @@ func (ts *TransactionHandlerTestSuite) TestFindByID() {
 	ts.repositoryMock.EXPECT().FindByID(expectedTransaction.ID).Return(expectedTransaction, nil).Once()
 	ts.cryptoProviderMock.EXPECT().Decrypt(mock.AnythingOfType("*entities.Transaction")).Return(nil).Once()
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", expectedTransaction.ID), nil)
-	res := httptest.NewRecorder()
-
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodGet,
+		fmt.Sprintf("/transactions/%s", expectedTransaction.ID), nil)
 
 	// then
 	ts.Require().Equal(http.StatusOK, res.Code)
@@ -152,20 +143,17 @@ func (ts *TransactionHandlerTestSuite) TestFindByID_WithErrorOnFindByID() {
 	// given
 	randomID := uuid.NewString()
 
-	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, errors.New("error on FindByID"))
-
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
-	res := httptest.NewRecorder()
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, errorOnMethod("FindByID"))
 
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
 
 	// then
 	ts.Require().Equal(http.StatusInternalServerError, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 
-	isValidResponseJSON := json.Valid(res.Body.Bytes())
-	ts.Require().True(isValidResponseJSON, "invalid error response JSON payload.", res.Body.String())
+	requireValidJSON(ts.T(), res.Body.Bytes(), "invalid error response JSON payload.",
+		res.Body.String())
 }
 
 func (ts *TransactionHandlerTestSuite) TestFindByID_WhenNotFound() {
@@ -174,18 +162,14 @@ func (ts *TransactionHandlerTestSuite) TestFindByID_WhenNotFound() {
 
 	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, nil).Once()
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
-	res := httptest.NewRecorder()
-
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
 
 	// then
 	ts.Require().Equal(http.StatusNotFound, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 
-	isValidResponseJSON := json.Valid(res.Body.Bytes())
-	ts.Require().True(isValidResponseJSON, "invalid error response JSON payload.", res.Body.String())
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
 }
 
 func (ts *TransactionHandlerTestSuite) TestFindByID_WithErrorOnDecrypt() {
@@ -194,20 +178,16 @@ func (ts *TransactionHandlerTestSuite) TestFindByID_WithErrorOnDecrypt() {
 
 	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
 	ts.cryptoProviderMock.EXPECT().Decrypt(mock.AnythingOfType("*entities.Transaction")).
-		Return(errors.New("error on Decrypt"))
-
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
-	res := httptest.NewRecorder()
+		Return(errorOnMethod("Decrypt"))
 
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodGet, fmt.Sprintf("/transactions/%s", randomID), nil)
 
 	// then
 	ts.Require().Equal(http.StatusInternalServerError, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 
-	isValidResponseJSON := json.Valid(res.Body.Bytes())
-	ts.Require().True(isValidResponseJSON, "invalid error response JSON payload.", res.Body.String())
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
 }
 
 func (ts *TransactionHandlerTestSuite) TestFindAll() {
@@ -221,11 +201,8 @@ func (ts *TransactionHandlerTestSuite) TestFindAll() {
 	ts.cryptoProviderMock.EXPECT().Decrypt(mock.AnythingOfType("*entities.Transaction")).
 		Return(nil).Times(2)
 
-	req := httptest.NewRequest(http.MethodGet, "/transactions", nil)
-	res := httptest.NewRecorder()
-
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodGet, "/transactions", nil)
 
 	// then
 	ts.Require().Equal(http.StatusOK, res.Code)
@@ -243,20 +220,16 @@ func (ts *TransactionHandlerTestSuite) TestFindAll() {
 
 func (ts *TransactionHandlerTestSuite) TestFindAll_WithErrorOnFindAll() {
 	// given
-	ts.repositoryMock.EXPECT().FindAll().Return(nil, errors.New("error on FindAll"))
-
-	req := httptest.NewRequest(http.MethodGet, "/transactions", nil)
-	res := httptest.NewRecorder()
+	ts.repositoryMock.EXPECT().FindAll().Return(nil, errorOnMethod("FindAll"))
 
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodGet, "/transactions", nil)
 
 	// then
 	ts.Require().Equal(http.StatusInternalServerError, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 
-	isValidResponseJSON := json.Valid(res.Body.Bytes())
-	ts.Require().True(isValidResponseJSON)
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
 }
 
 func (ts *TransactionHandlerTestSuite) TestFindAll_WithErrorOnDecrypt() {
@@ -266,20 +239,215 @@ func (ts *TransactionHandlerTestSuite) TestFindAll_WithErrorOnDecrypt() {
 	}
 
 	ts.repositoryMock.EXPECT().FindAll().Return(transactions, nil)
-	ts.cryptoProviderMock.EXPECT().Decrypt(transactions[0]).Return(errors.New("error on Decrypt"))
-
-	req := httptest.NewRequest(http.MethodGet, "/transactions", nil)
-	res := httptest.NewRecorder()
+	ts.cryptoProviderMock.EXPECT().Decrypt(transactions[0]).Return(errorOnMethod("Decrypt"))
 
 	// when
-	ts.router.ServeHTTP(res, req)
+	res := makeRequest(ts.router, http.MethodGet, "/transactions", nil)
 
 	// then
 	ts.Require().Equal(http.StatusInternalServerError, res.Code)
 	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
 
-	isValidResponseJSON := json.Valid(res.Body.Bytes())
-	ts.Require().True(isValidResponseJSON)
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestUpdateByID() {
+	// given
+	randomID := uuid.NewString()
+
+	updatedTransaction, err := generateRandomTransactionJSON(false, true)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
+	ts.cryptoProviderMock.EXPECT().Encrypt(mock.AnythingOfType("*entities.Transaction")).
+		Return(nil)
+	ts.repositoryMock.EXPECT().UpdateByID(mock.AnythingOfType("*entities.Transaction")).
+		Return(nil)
+
+	// when
+	res := makeRequest(ts.router, http.MethodPut, fmt.Sprintf("/transactions/%s", randomID),
+		strings.NewReader(updatedTransaction))
+
+	// then
+	ts.Require().Equal(http.StatusOK, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	ts.Require().Empty(res.Body.Bytes())
+}
+
+func (ts *TransactionHandlerTestSuite) TestUpdateByID_WhenNotFound() {
+	// given
+	randomID := "abc"
+
+	updatedTransaction, err := generateRandomTransactionJSON(false, true)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, nil)
+
+	// when
+	res := makeRequest(ts.router, http.MethodPut, fmt.Sprintf("/transactions/%s", randomID),
+		strings.NewReader(updatedTransaction))
+
+	// then
+	ts.Require().Equal(http.StatusNotFound, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestUpdateByID_WithErrorOnFindByID() {
+	// given
+	randomID := uuid.NewString()
+
+	updatedTransaction, err := generateRandomTransactionJSON(false, true)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, errorOnMethod("FindByID"))
+
+	// when
+	res := makeRequest(ts.router, http.MethodPut, fmt.Sprintf("/transactions/%s", randomID),
+		strings.NewReader(updatedTransaction))
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestUpdateByID_WithInvalidBody() {
+	// given
+	randomID := uuid.NewString()
+
+	updatedTransaction, err := generateRandomTransactionJSON(false, false)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
+
+	// when
+	res := makeRequest(ts.router, http.MethodPut, fmt.Sprintf("/transactions/%s", randomID),
+		strings.NewReader(updatedTransaction))
+
+	// then
+	ts.Require().Equal(http.StatusUnprocessableEntity, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	ts.Require().Empty(res.Body.Bytes())
+}
+
+func (ts *TransactionHandlerTestSuite) TestUpdateByID_WithErrorOnEncrypt() {
+	// given
+	randomID := uuid.NewString()
+
+	updatedTransaction, err := generateRandomTransactionJSON(false, true)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
+	ts.cryptoProviderMock.EXPECT().Encrypt(mock.AnythingOfType("*entities.Transaction")).
+		Return(errorOnMethod("Encrypt"))
+
+	// when
+	res := makeRequest(ts.router, http.MethodPut, fmt.Sprintf("/transactions/%s", randomID),
+		strings.NewReader(updatedTransaction))
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestUpdateByID_WithErrorOnUpdateByID() {
+	// given
+	randomID := uuid.NewString()
+
+	updatedTransaction, err := generateRandomTransactionJSON(false, true)
+	if err != nil {
+		ts.T().Fatal(err)
+	}
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
+	ts.cryptoProviderMock.EXPECT().Encrypt(mock.AnythingOfType("*entities.Transaction")).Return(nil)
+	ts.repositoryMock.EXPECT().UpdateByID(mock.AnythingOfType("*entities.Transaction")).
+		Return(errorOnMethod("UpdateByID"))
+
+	// when
+	res := makeRequest(ts.router, http.MethodPut, fmt.Sprintf("/transactions/%s", randomID),
+		strings.NewReader(updatedTransaction))
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	ts.Require().Equal("application/json", res.Header().Get("Content-Type"))
+
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestDeleteByID() {
+	// given
+	randomID := uuid.NewString()
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
+	ts.repositoryMock.EXPECT().DeleteByID(randomID).Return(nil)
+
+	// when
+	res := makeRequest(ts.router, http.MethodDelete, fmt.Sprintf("/transactions/%s", randomID), nil)
+
+	// then
+	ts.Require().Equal(http.StatusOK, res.Code)
+	ts.Require().Empty(res.Body.Bytes())
+}
+
+func (ts *TransactionHandlerTestSuite) TestDeleteByID_WithErrorOnFindByID() {
+	// given
+	randomID := uuid.NewString()
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, errorOnMethod("DeleteByID"))
+
+	// when
+	res := makeRequest(ts.router, http.MethodDelete, fmt.Sprintf("/transactions/%s", randomID), nil)
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestDeleteByID_WhenNotFound() {
+	// given
+	randomID := uuid.NewString()
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(nil, nil)
+
+	// when
+	res := makeRequest(ts.router, http.MethodDelete, fmt.Sprintf("/transactions/%s", randomID), nil)
+
+	// then
+	ts.Require().Equal(http.StatusNotFound, res.Code)
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
+}
+
+func (ts *TransactionHandlerTestSuite) TestDeleteByID_WithErrorOnDeleteByID() {
+	// given
+	randomID := uuid.NewString()
+
+	ts.repositoryMock.EXPECT().FindByID(randomID).Return(&entities.Transaction{}, nil)
+	ts.repositoryMock.EXPECT().DeleteByID(randomID).Return(errorOnMethod("DeleteByID"))
+
+	// when
+	res := makeRequest(ts.router, http.MethodDelete, fmt.Sprintf("/transactions/%s", randomID), nil)
+
+	// then
+	ts.Require().Equal(http.StatusInternalServerError, res.Code)
+	requireValidJSON(ts.T(), res.Body.Bytes(), InvalidJSONResponsePayload, res.Body.String())
 }
 
 func TestTransactionHandlerTestSuite(t *testing.T) {
@@ -323,4 +491,21 @@ func generateRandomTransaction(withID bool) *entities.Transaction {
 		CreditCardToken: randomCreditCardToken,
 		Value:           randomValue,
 	}
+}
+
+func requireValidJSON(t *testing.T, data []byte, msgAndArgs ...string) {
+	require.True(t, json.Valid(data), msgAndArgs)
+}
+
+func errorOnMethod(method string) error {
+	return fmt.Errorf("error on %s", method)
+}
+
+func makeRequest(router *chi.Mux, method, path string, body io.Reader) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, body)
+	rr := httptest.NewRecorder()
+
+	router.ServeHTTP(rr, req)
+
+	return rr
 }
