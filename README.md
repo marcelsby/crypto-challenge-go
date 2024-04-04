@@ -32,10 +32,10 @@ Com coverage:
 go test -cover ./...
 ```
 
-Com coverage e logs:
+Com coverage e logs completos:
 
 ```bash
-go test -cover ./...
+go test -cover -v ./...
 ```
 
 Os testes de integração do repositório sobem um contêiner de MySQL utilizando a biblioteca Testcontainers,
